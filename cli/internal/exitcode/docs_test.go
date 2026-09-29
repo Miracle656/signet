@@ -26,7 +26,7 @@ func exitCodeTable(t *testing.T, path string) []int {
 	if err != nil {
 		t.Fatalf("open %s: %v", path, err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	var codes []int
 	inSection := false
