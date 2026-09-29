@@ -1,0 +1,29 @@
+/**
+ * The contract page's tab set (#445, docs/CONTRACT_DOCS_DESIGN.md §2.1).
+ *
+ * One pure table owns the list: the layout's nav renders from it, tests
+ * assert on it, and later epics (the diagram's `…/functions#fn-{name}` links,
+ * for one) address tabs by `segment` without re-declaring them. `segment` is
+ * the App Router child segment — `null` is the index route (Overview), which
+ * is also what `useSelectedLayoutSegment()` reports for it.
+ */
+export interface ContractTab {
+  id: string;
+  label: string;
+  segment: string | null;
+}
+
+export const CONTRACT_TABS: readonly ContractTab[] = [
+  { id: 'overview', label: 'Overview', segment: null },
+  { id: 'functions', label: 'Functions', segment: 'functions' },
+  { id: 'types', label: 'Types', segment: 'types' },
+  { id: 'diagram', label: 'Diagram', segment: 'diagram' },
+  { id: 'run', label: 'Run locally', segment: 'run' },
+  { id: 'activity', label: 'Activity', segment: 'activity' },
+];
+
+/** Absolute href for a tab under one contract's base route. */
+export function contractTabHref(handle: string, address: string, tab: ContractTab): string {
+  const base = `/p/${handle}/contract/${address}`;
+  return tab.segment === null ? base : `${base}/${tab.segment}`;
+}
