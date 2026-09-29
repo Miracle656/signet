@@ -52,3 +52,6 @@ export interface LayoutOptions {
  * every consumer builds against one contract.
  */
 export type LayoutContractGraph = (spec: ContractSpec, options?: LayoutOptions) => DiagramModel;
+
+// Deterministic text metrics (E-05): the layout's only measure of a label.
+export { MIN_TEXT_PX, textCells, textWidth, truncateLabel } from './metrics.ts';

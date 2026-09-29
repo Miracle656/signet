@@ -1,5 +1,7 @@
 import { notFound } from 'next/navigation';
-import { SignetMonogram } from '../../(marketing)/components/signet-monogram';
+import { SectionLabel } from './_components/section-label';
+import { SiteFooter } from './_components/site-footer';
+import { SiteNav } from './_components/site-nav';
 import {
   getProfile,
   getOperationsResult,
@@ -67,28 +69,8 @@ export default async function ProfilePage({ params }: { params: Promise<{ handle
         aria-hidden="true"
       />
 
-      {/* Nav */}
-      <nav className="relative z-40 flex items-center justify-between border-b border-[#1f1d19] px-8 py-6 md:px-14">
-        <a href="/" className="flex items-center gap-3">
-          <SignetMonogram className="h-5 w-5 text-[#f5f4ee]" />
-          <span className="text-[14px] font-medium tracking-tight">Signet</span>
-        </a>
-        <div
-          className="hidden gap-8 text-[11px] uppercase tracking-[0.22em] text-[#8a8779] md:flex"
-          style={{ fontFamily: 'var(--font-mono)' }}
-        >
-          <a href="/" className="transition-colors hover:text-[#f5f4ee]">Home</a>
-          <a href="/how-it-works" className="transition-colors hover:text-[#f5f4ee]">How it works</a>
-        </div>
-        <a
-          href="/#claim"
-          className="text-[11px] uppercase tracking-[0.22em] text-[#f5f4ee]"
-          style={{ fontFamily: 'var(--font-mono)' }}
-        >
-          <span className="border-b border-[#8b1a1a] pb-1">Claim yours</span>
-          <span className="ml-1.5 text-[#8b1a1a]">→</span>
-        </a>
-      </nav>
+      {/* Nav — shared with the contract sub-route (#445) */}
+      <SiteNav />
 
       {/* Header */}
       <header className="relative z-10 border-b border-[#1f1d19] px-8 py-16 md:px-14 md:py-20">
@@ -301,39 +283,8 @@ export default async function ProfilePage({ params }: { params: Promise<{ handle
         </section>
       </div>
 
-      {/* Footer */}
-      <footer className="relative z-10 flex flex-wrap items-center justify-between gap-3 border-t border-[#1f1d19] px-8 py-4 md:px-14">
-        <div
-          className="flex items-center gap-7 text-[10px] uppercase tracking-[0.22em] text-[#8a8779]"
-          style={{ fontFamily: 'var(--font-mono)' }}
-        >
-          <span className="flex items-center gap-2.5">
-            <span className="relative flex h-1.5 w-1.5">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#8b1a1a] opacity-60" />
-              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[#8b1a1a]" />
-            </span>
-            {`Stellar ${STELLAR_NETWORK_NAME.toLowerCase()}`}
-          </span>
-        </div>
-        <div
-          className="text-[10px] uppercase tracking-[0.22em] text-[#3d3a33]"
-          style={{ fontFamily: 'var(--font-mono)' }}
-        >
-          Stellar Community Fund · 2026
-        </div>
-      </footer>
-    </div>
-  );
-}
-
-function SectionLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <div
-      className="flex items-center gap-3 text-[10px] uppercase tracking-[0.26em] text-[#8a8779]"
-      style={{ fontFamily: 'var(--font-mono)' }}
-    >
-      <span className="h-1.5 w-1.5 rounded-full bg-[#8b1a1a]" aria-hidden="true" />
-      {children}
+      {/* Footer — shared with the contract sub-route (#445) */}
+      <SiteFooter />
     </div>
   );
 }
