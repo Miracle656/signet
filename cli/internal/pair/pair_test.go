@@ -23,7 +23,7 @@ func TestStart_DeclaresTheDeployKey(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	started, err := New(srv.URL).Start(context.Background(), "Test SDF Network ; September 2015", "GABC")
+	started, err := New(srv.URL).Start(context.Background(), "testnet", "GABC")
 	if err != nil {
 		t.Fatalf("Start: %v", err)
 	}
@@ -32,6 +32,27 @@ func TestStart_DeclaresTheDeployKey(t *testing.T) {
 	}
 	if got["publicKey"] != "GABC" {
 		t.Fatalf("publicKey not declared to the server: %+v", got)
+	}
+}
+
+// #616: the wire carries the network NAME the command resolved (`--network
+// testnet` by default, cmd/link.go), verbatim — not a passphrase. The server
+// compares names too, so the value sent here is the value judged there.
+func TestStart_SendsTheResolvedNetworkName(t *testing.T) {
+	var got map[string]string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		_ = json.Unmarshal(body, &got)
+		w.Header().Set("content-type", "application/json")
+		_, _ = io.WriteString(w, `{"state":"p_1","pollToken":"tok","expiresAt":"2026-09-29T12:05:00Z"}`)
+	}))
+	defer srv.Close()
+
+	if _, err := New(srv.URL).Start(context.Background(), "testnet", "GABC"); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	if got["network"] != "testnet" {
+		t.Fatalf("start body network = %q, want the resolved name %q", got["network"], "testnet")
 	}
 }
 

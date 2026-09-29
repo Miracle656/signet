@@ -10,6 +10,8 @@ import {
   rejectPairing,
   completePairing,
   describePairing,
+  checkStartNetwork,
+  resolvePairingNetwork,
   type PairingStore,
 } from './pairing.ts';
 
@@ -661,4 +663,55 @@ test('an expired pairing cannot be completed even with a valid signature', async
   const result = await completePairing(state, signedChallenge(client), store);
   assert.deepEqual(result, { ok: false, reason: 'expired' });
   assert.equal(wallets.has(client.publicKey()), false);
+});
+
+// ── #616: the wire uses network NAMES ─────────────────────────────────────
+
+test('start with "testnet" on a testnet deployment mints a pairing that completes', async () => {
+  const { store, wallets } = fakeStore();
+  wallets.set('GOWNER', { pubkey: 'GOWNER', profileId: 'profile_1' });
+
+  const checked = checkStartNetwork('testnet');
+  assert.deepEqual(checked, { ok: true, network: 'testnet' });
+  const { state } = (await startPairing('testnet', null, store))!;
+  await approvePairing(state, 'GOWNER', store);
+
+  const client = Keypair.random();
+  const result = await completePairing(state, signedChallenge(client), store);
+  assert.equal(result.ok, true, `name-based pairing must complete, got ${JSON.stringify(result)}`);
+});
+
+test('start with "mainnet" on a testnet deployment is refused before any row exists', () => {
+  const checked = checkStartNetwork('mainnet');
+  assert.deepEqual(checked, {
+    ok: false,
+    error: 'network-mismatch',
+    requested: 'mainnet',
+    configured: 'testnet',
+  });
+  // The route returns 400 on !ok and never calls startPairing — the check
+  // itself creates nothing, which is the point: the mismatch must surface
+  // before the user is sent to approve a pairing that can only fail.
+});
+
+test('a network passphrase is still accepted for one release and maps to its name', async () => {
+  assert.equal(resolvePairingNetwork('Test SDF Network ; September 2015'), 'testnet');
+  assert.equal(resolvePairingNetwork('Public Global Stellar Network ; September 2015'), 'mainnet');
+
+  // End to end: the deprecated wire value resolves, and the row stores the
+  // NAME the route resolved, not the passphrase it received.
+  const checked = checkStartNetwork('Test SDF Network ; September 2015');
+  assert.deepEqual(checked, { ok: true, network: 'testnet' });
+  const { store, pairings } = fakeStore();
+  const { state } = (await startPairing(checked.ok ? checked.network : '', null, store))!;
+  assert.equal(pairings.get(state)!.network, 'testnet');
+});
+
+test('start with no network, or an unknown one, is a 400', () => {
+  assert.deepEqual(checkStartNetwork(undefined), { ok: false, error: 'unknown-network' });
+  assert.deepEqual(checkStartNetwork(''), { ok: false, error: 'unknown-network' });
+  assert.deepEqual(checkStartNetwork('Some Other Network ; 2026'), {
+    ok: false,
+    error: 'unknown-network',
+  });
 });

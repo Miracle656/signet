@@ -97,9 +97,11 @@ test.describe('claim → link → indexer → profile', () => {
 
     // ── link ─────────────────────────────────────────────────────────────
     // The CLI's first call: mint a pairing, declaring the deploy account so
-    // the browser can show which key it is approving.
+    // the browser can show which key it is approving. The body is shaped
+    // exactly as `signet link --network testnet` sends it (#616) — omitting
+    // `network` was how this spec missed the name-vs-passphrase mismatch.
     const started = await page.request.post('/api/cli/pair/start', {
-      data: { publicKey: deployer.publicKey() },
+      data: { network: 'testnet', publicKey: deployer.publicKey() },
     });
     expect(started.ok(), 'pair/start should mint a pairing').toBeTruthy();
     const { state, pollToken } = (await started.json()) as {

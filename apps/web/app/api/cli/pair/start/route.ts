@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import { startPairing } from '@/lib/server/pairing';
-import { getNetworkPassphrase } from '@/lib/sep10';
+import { checkStartNetwork, startPairing } from '@/lib/server/pairing';
 import { LIMITS, enforceRateLimit } from '@/lib/rate-limit-http';
 
 export const runtime = 'nodejs';
@@ -34,7 +33,27 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'publicKey must be a Stellar G… address' }, { status: 400 });
   }
 
-  const pairing = await startPairing(network || getNetworkPassphrase(), publicKey ?? null);
+  // The wire uses network names (#616). Unknown or missing → 400; a network
+  // that doesn't match this deployment's → 400 naming both, BEFORE a row
+  // exists — the old flow only surfaced the mismatch at `complete`, after
+  // the user had already approved in the browser.
+  const checked = checkStartNetwork(network);
+  if (!checked.ok) {
+    if (checked.error === 'network-mismatch') {
+      return NextResponse.json(
+        {
+          error: `Network mismatch: the CLI requested "${checked.requested}" but this deployment is configured for "${checked.configured}".`,
+        },
+        { status: 400 },
+      );
+    }
+    return NextResponse.json(
+      { error: 'network must be a Stellar network name, e.g. "testnet" or "mainnet"' },
+      { status: 400 },
+    );
+  }
+
+  const pairing = await startPairing(checked.network, publicKey ?? null);
   if (!pairing) {
     return NextResponse.json(
       {

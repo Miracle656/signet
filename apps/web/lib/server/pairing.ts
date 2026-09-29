@@ -1,6 +1,9 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
+import { NETWORKS, networkPassphrase, normalizeNetwork, type Network } from '@signet/types';
 import { spendChallenge } from './challenge-spend.ts';
-import { verifyChallenge, getNetworkPassphrase, Sep10Error } from '../sep10.ts';
+import { verifyChallenge, Sep10Error } from '../sep10.ts';
+import { getConfiguredNetwork } from '../cli-link.ts';
+import { isMainnetNetwork } from '../network-guard.ts';
 import { logger } from '../logger.ts';
 
 /**
@@ -43,6 +46,59 @@ const HANDOFF_ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
 const HANDOFF_LENGTH = 8;
 
 const sha256 = (value: string): string => createHash('sha256').update(value).digest('hex');
+
+/**
+ * The wire uses network NAMES (#616): `signet link --network testnet` sends
+ * `"testnet"`, and comparing that against a passphrase is the bug this
+ * replaces — every real `signet link` passed browser approval and then died
+ * at `complete` with `network-mismatch`.
+ *
+ * Resolve an incoming value to its canonical [`Network`] name: `testnet` /
+ * `mainnet` (and the aliases `normalizeNetwork` knows), or — for one release
+ * — a full network passphrase, mapped back to its name and logged as
+ * deprecated so old CLIs keep working while the wire converges. `null` means
+ * unknown: the caller rejects, it never guesses.
+ */
+export function resolvePairingNetwork(value: string): Network | null {
+  try {
+    return normalizeNetwork(value);
+  } catch {
+    // Not a name. A passphrase from the pre-#616 wire?
+    for (const network of NETWORKS) {
+      if (networkPassphrase(network) === value) {
+        logger.warn(
+          { event: 'pairing.passphraseDeprecated', network },
+          'pairing start received a network passphrase; send the network name instead',
+        );
+        return network;
+      }
+    }
+    return null;
+  }
+}
+
+export type StartNetworkCheck =
+  | { ok: true; network: Network }
+  | { ok: false; error: 'unknown-network' }
+  | { ok: false; error: 'network-mismatch'; requested: Network; configured: Network };
+
+/**
+ * Validate the network a `start` request declared, BEFORE any row exists: an
+ * unknown or missing value is a 400, and a network that doesn't match this
+ * deployment's is refused here — surfacing the mismatch only after the user
+ * has approved in the browser (the old behaviour) wastes the approval.
+ * Matching uses the same mainnet-vs-not logic as `assertNetworkMatches`.
+ */
+export function checkStartNetwork(value: string | undefined): StartNetworkCheck {
+  if (!value) return { ok: false, error: 'unknown-network' };
+  const requested = resolvePairingNetwork(value);
+  if (requested === null) return { ok: false, error: 'unknown-network' };
+  const configured = normalizeNetwork(getConfiguredNetwork());
+  if (isMainnetNetwork(requested) !== isMainnetNetwork(configured)) {
+    return { ok: false, error: 'network-mismatch', requested, configured };
+  }
+  return { ok: true, network: requested };
+}
 
 /** Constant-time compare of two hex digests. */
 function hashEquals(a: string, b: string): boolean {
@@ -124,7 +180,9 @@ export interface StartedPairing {
 }
 
 /**
- * Mint a pairing for `network` (a Stellar network passphrase).
+ * Mint a pairing for `network` (a canonical Stellar network NAME — the start
+ * route resolves and validates it via `checkStartNetwork` before any row is
+ * created).
  *
  * `publicKey` is the deploy account the CLI says it is about to link. It is
  * recorded unverified — the CLI has proved nothing at this point — purely so
@@ -395,7 +453,13 @@ export async function completePairing(
   if (pairing.status === 'completed') return fail(state, 'already-completed');
   if (pairing.status !== 'approved' || !pairing.profileId) return fail(state, 'not-approved');
   if (pairing.expiresAt <= new Date()) return fail(state, 'expired');
-  if (pairing.network !== getNetworkPassphrase()) return fail(state, 'network-mismatch');
+  // Names on both sides (#616): `start` stores the canonical network name and
+  // already refused a mismatched or unknown one, so this recheck only fires
+  // when the deployment's configured network changed between start and
+  // complete — or a row predating the name-based wire slipped through.
+  if (resolvePairingNetwork(pairing.network) !== normalizeNetwork(getConfiguredNetwork())) {
+    return fail(state, 'network-mismatch');
+  }
 
   let clientAccountId: string;
   try {

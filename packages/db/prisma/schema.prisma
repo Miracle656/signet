@@ -211,8 +211,11 @@ model PairingState {
   id          String    @id @default(cuid())
   /// pending | approved | rejected | completed
   status      String    @default("pending")
-  /// The network passphrase the CLI declared at `start`, checked again at
-  /// `complete` against the deployment's actual configured network.
+  /// The canonical network NAME (`testnet` / `mainnet`, #616) the CLI
+  /// declared at `start` — validated against the deployment's configured
+  /// network before the row is created, and rechecked at `complete`. Rows
+  /// predating the name-based wire held a passphrase; they expire within
+  /// 5 minutes, so no data migration accompanies the comment.
   network     String
   /// The deploy account the CLI *declared* at `start`, so the browser
   /// approval page can show which key is about to be attached. Unverified

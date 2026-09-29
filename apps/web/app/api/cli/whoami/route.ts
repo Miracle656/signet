@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getAccount } from '@/lib/server/account';
-import { getNetworkPassphrase } from '@/lib/sep10';
+import { normalizeNetwork } from '@signet/types';
+import { getConfiguredNetwork } from '@/lib/cli-link';
 import { isValidStellarAddress } from '@/lib/stellar-address';
 import { LIMITS, enforceRateLimit } from '@/lib/rate-limit-http';
 
@@ -40,7 +41,10 @@ export async function GET(req: Request) {
       publicKey,
       handle: account.handle ?? null,
       linked: Boolean(account.handle),
-      network: getNetworkPassphrase(),
+      // The network NAME (#616): the wire speaks names end to end now — the
+      // start route accepts them and this mirrors it. pair.Identity on the Go
+      // side is unchanged; it only displays the value.
+      network: normalizeNetwork(getConfiguredNetwork()),
     },
     { headers: { 'cache-control': 'no-store' } },
   );
