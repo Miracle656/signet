@@ -213,6 +213,10 @@ Stable, so scripts can branch on the code rather than on message text.
 | `7` | Timed out waiting for approval |
 | `8` | Approval rejected in the browser |
 | `9` | Already linked — the wallet has a conflicting binding |
+| `10` | Diff found — a sandbox comparison found a difference; a finding, not a failure |
+| `11` | Host unsupported — the simulator can't serve this network |
+| `12` | Build failed — the contract under test failed to build |
+| `13` | Simulator failure — the simulator itself failed, not the contract call it was running |
 
 ## Troubleshooting
 
@@ -231,6 +235,10 @@ Stable, so scripts can branch on the code rather than on message text.
 | `This challenge was signed by a different account than the one approved in the browser` | The identity changed between approving and signing | Re-run `signet link` so the key shown and the key signed are the same |
 | `CLI linking requires a database, and this deployment has none configured` (exit `3`) | The deployment has no `DATABASE_URL`; a link would have nowhere to be written | The operator provisions one (tracked in #191). Not something you can fix from the terminal — and `/link` says so before you approve |
 | `That confirmation code does not match the one shown in the browser` | The pasted handoff code is wrong or from another attempt | Copy it again from the approval page, or re-run `signet link` |
+| A sandbox run exits `10` with no error text | A comparison found a diff — that is the result, not a failure | Read the printed diff; in CI, branch on `$? -eq 10` to treat "changed" differently from "broken" |
+| `host unsupported` (exit `11`) | The simulator does not model this network's protocol version or host functions | Run against a network the simulator supports, or upgrade the CLI for a newer simulator |
+| `contract build failed` (exit `12`) | The contract under test did not compile, so nothing ran | Fix the build first — the same errors appear building it directly |
+| `simulator failure` (exit `13`) | The simulator itself broke — distinct from your contract call failing inside it | Re-run with `--json` for the structured error and report it; your contract may be fine |
 
 ## See also
 

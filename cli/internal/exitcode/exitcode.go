@@ -31,6 +31,12 @@ const (
 	Timeout          = 7
 	ApprovalRejected = 8
 	AlreadyLinked    = 9
+
+	// Sandbox outcomes (#528). Stable so CI scripts can branch on `$?`.
+	DiffFound        = 10
+	HostUnsupported  = 11
+	BuildFailed      = 12
+	SimulatorFailure = 13
 )
 
 // Sentinel errors for each documented failure class beyond invalid input.
@@ -73,6 +79,26 @@ var (
 	// a conflict, not a transient failure; retrying with the same input
 	// won't help.
 	ErrAlreadyLinked = errors.New("wallet already linked")
+
+	// ErrDiffFound: a sandbox comparison found a difference. Like grep's
+	// exit 1, this is a FINDING, not a failure — the run itself worked, and
+	// a CI script branching on the code is exactly who this exists for.
+	ErrDiffFound = errors.New("diff found")
+
+	// ErrHostUnsupported: the simulator cannot serve the requested network
+	// (protocol version, host functions, or network id it does not model).
+	ErrHostUnsupported = errors.New("host unsupported")
+
+	// ErrBuildFailed: the contract under test failed to build, so there was
+	// nothing to run — a property of the contract, not of the simulator.
+	ErrBuildFailed = errors.New("contract build failed")
+
+	// ErrSimulator: the simulator ITSELF failed. Deliberately distinct from
+	// a contract call that failed inside a working simulator — the category
+	// docs/CLI_RUST_BRIDGE.md §3 keeps apart, because conflating them makes
+	// "the call I'm testing failed" and "the sandbox is broken"
+	// indistinguishable from a script.
+	ErrSimulator = errors.New("simulator failure")
 )
 
 // sentinelCodes pairs each sentinel above with its exit code, in the same
@@ -89,6 +115,10 @@ var sentinelCodes = []struct {
 	{ErrTimeout, Timeout},
 	{ErrApprovalRejected, ApprovalRejected},
 	{ErrAlreadyLinked, AlreadyLinked},
+	{ErrDiffFound, DiffFound},
+	{ErrHostUnsupported, HostUnsupported},
+	{ErrBuildFailed, BuildFailed},
+	{ErrSimulator, SimulatorFailure},
 }
 
 // CodeFor returns the exit code for the first sentinel err matches via

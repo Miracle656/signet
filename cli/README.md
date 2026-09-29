@@ -164,6 +164,10 @@ releases.
 | `7` | Timed out |
 | `8` | Approval rejected — the developer (or the deployment, on their behalf) explicitly declined |
 | `9` | Already linked — the target wallet already has a conflicting binding |
+| `10` | Diff found — a sandbox comparison found a difference; a finding, not a failure (like `grep`'s exit 1) |
+| `11` | Host unsupported — the simulator can't serve this network (protocol version, host functions, or network id it doesn't model) |
+| `12` | Build failed — the contract under test failed to build, so there was nothing to run |
+| `13` | Simulator failure — the simulator itself failed, as opposed to a contract call failing inside a working simulator (the distinction `docs/CLI_RUST_BRIDGE.md` §3 keeps) |
 
 Every code has a real caller now: `link` and `unlink` raise `3`–`9` between
 them (configuration, identity resolution, `stellar tx sign`, reaching the

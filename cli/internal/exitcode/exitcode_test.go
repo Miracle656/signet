@@ -64,3 +64,28 @@ func TestSentinelsAreAllDistinctCodes(t *testing.T) {
 		seen[s.code] = s.err
 	}
 }
+
+// Sandbox outcome sentinels (#528): each maps to its documented code, both
+// bare and through %w wrapping — a real caller always wraps.
+func TestCodeForSandboxSentinels(t *testing.T) {
+	cases := []struct {
+		err  error
+		code int
+	}{
+		{ErrDiffFound, DiffFound},
+		{ErrHostUnsupported, HostUnsupported},
+		{ErrBuildFailed, BuildFailed},
+		{ErrSimulator, SimulatorFailure},
+	}
+	for _, c := range cases {
+		code, ok := CodeFor(c.err)
+		if !ok || code != c.code {
+			t.Fatalf("CodeFor(%v) = (%d, %v), want (%d, true)", c.err, code, ok, c.code)
+		}
+		wrapped := fmt.Errorf("sandbox: %w", c.err)
+		code, ok = CodeFor(wrapped)
+		if !ok || code != c.code {
+			t.Fatalf("CodeFor(wrapped %v) = (%d, %v), want (%d, true)", c.err, code, ok, c.code)
+		}
+	}
+}
