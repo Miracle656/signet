@@ -8,8 +8,14 @@ import {
   type FailureCopy,
   type InterfaceSummary,
 } from '@/lib/contract-overview';
-import { contractTabSegmentHref } from '@/lib/contract-tabs';
-import { loadLatestSnapshot, loadOverviewSpec } from '@/lib/server/contract-overview-source';
+import { contractStubHref, contractTabSegmentHref } from '@/lib/contract-tabs';
+import { describeUpgrades, type UpgradesDescription } from '@/lib/contract-upgrades';
+import {
+  loadLatestSnapshot,
+  loadOverviewSpec,
+  loadWasmVersions,
+} from '@/lib/server/contract-overview-source';
+import { CopyAddress } from '../../copy-address';
 import { SectionLabel } from '../../_components/section-label';
 import { Provenance } from './_docs/provenance';
 
@@ -125,6 +131,39 @@ function ActivityBlock({ summary, href }: { summary: ActivitySummary; href: stri
   );
 }
 
+function UpgradesBlock({ upgrades }: { upgrades: UpgradesDescription }) {
+  return (
+    <div className="space-y-4" style={MONO} data-testid="overview-upgrades">
+      <ul className="divide-y divide-[#1f1d19] border-y border-[#1f1d19]">
+        {upgrades.versions.map((v) => (
+          <li
+            key={`${v.wasmHash}-${v.observedLedger}`}
+            className="flex flex-col gap-1 py-3 text-[13px] sm:flex-row sm:items-center sm:justify-between"
+            data-testid="upgrade-row"
+          >
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <CopyAddress address={v.wasmHash} display={v.truncatedHash} label="WASM hash" />
+              <span className="text-[#8a8779]">·</span>
+              <span className="text-[#8a8779]">{v.label}</span>
+            </div>
+            <div className="flex items-center gap-3 text-[#8a8779]">
+              <time dateTime={v.observedAt} className="text-[#f5f4ee] tabular-nums">
+                {v.observedOn}
+              </time>
+              <span>ledger {v.observedLedger.toLocaleString()}</span>
+            </div>
+          </li>
+        ))}
+      </ul>
+      {upgrades.windowSentence && (
+        <p className="max-w-[65ch] text-[12px] leading-[1.7] text-[#8a8779]" data-testid="upgrades-window-sentence">
+          {upgrades.windowSentence}
+        </p>
+      )}
+    </div>
+  );
+}
+
 /**
  * Overview tab (#449, design §2.2). Every fact here is read from the deployed
  * WASM or the index; there is no prose written by Signet and no placeholder
@@ -142,17 +181,19 @@ export default async function ContractOverviewPage({
   if (attribution.status !== 'attributed') return null;
 
   const { contract } = attribution;
-  const [specInput, snapshot] = await Promise.all([
+  const [specInput, snapshot, wasmVersions] = await Promise.all([
     loadOverviewSpec({
       address,
       network: normalizeNetwork(contract.network),
       wasmHash: contract.wasmHash,
     }),
     loadLatestSnapshot(address, contract.network),
+    loadWasmVersions(address, contract.network),
   ]);
 
   const overview = summariseSpec(specInput);
   const activity = summariseActivity(snapshot);
+  const upgrades = describeUpgrades(wasmVersions);
   const href = (segment: string) => contractTabSegmentHref(handle, address, segment);
 
   return (
@@ -179,6 +220,15 @@ export default async function ContractOverviewPage({
         wasmHash={contract.wasmHash}
       />
 
+      {upgrades.versions.length > 0 && (
+        <div>
+          <SectionLabel as="h2">Upgrades</SectionLabel>
+          <div className="mt-4">
+            <UpgradesBlock upgrades={upgrades} />
+          </div>
+        </div>
+      )}
+
       <div>
         <SectionLabel>Activity</SectionLabel>
         <div className="mt-4">
@@ -196,6 +246,27 @@ export default async function ContractOverviewPage({
           Open run locally
         </Link>
       </div>
+
+      {overview.status === 'ok' && (
+        <div>
+          <SectionLabel>Client stubs</SectionLabel>
+          <ul className="mt-4 space-y-3 text-[13px] leading-[1.7] text-[#b8b5a8]" style={MONO}>
+            <li>
+              <a href={contractStubHref(handle, address, 'ts')} download className={TEXT_LINK}>
+                Download TypeScript client
+              </a>{' '}
+              — a full generated client (ZIP), built with the Stellar SDK&apos;s binding generator.
+            </li>
+            <li>
+              <a href={contractStubHref(handle, address, 'go')} download className={TEXT_LINK}>
+                Download Go stub
+              </a>{' '}
+              — a thin .go file: typed argument structs and functions that build the
+              InvokeHostFunction operation. No simulation, signing or submission.
+            </li>
+          </ul>
+        </div>
+      )}
     </section>
   );
 }
