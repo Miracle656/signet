@@ -2,6 +2,7 @@ import { Suspense } from 'react';
 import { headers } from 'next/headers';
 import { notFound } from 'next/navigation';
 import { attributeContract } from '@/lib/contract-attribution';
+import { LIMITS, rateLimitDecision } from '@/lib/rate-limit-policy';
 import { SiteFooter } from '../../_components/site-footer';
 import { SiteNav } from '../../_components/site-nav';
 import { AnnounceProvider } from './announcer';
@@ -9,6 +10,9 @@ import { ContractHeader } from './_components/contract-header';
 import { ContractHeaderSkeleton } from './_components/contract-header-skeleton';
 import { ContractTabsNav } from './tabs-nav';
 import { TabFocus } from './tab-focus';
+
+import type { Metadata } from 'next';
+import { formatDate } from '@/lib/format-date';
 
 // Rendered per request. The root layout reads request headers for the CSP
 // nonce, so no route can be statically pre-rendered anyway, and attribution
@@ -24,6 +28,41 @@ function truncate(str: string, head: number, tail: number): string {
   return `${str.slice(0, head)}...${str.slice(-tail)}`;
 }
 
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ handle: string; address: string }>;
+}): Promise<Metadata> {
+  const { handle, address } = await params;
+  const attribution = await attributeContract(handle, address);
+
+  if (attribution.status !== 'attributed') {
+    return {
+      title: 'Contract Not Found · Signet',
+      description:
+        'The requested contract could not be found or is not attributed to this developer.',
+    };
+  }
+
+  const { contract } = attribution;
+  const shortAddress = truncate(contract.address, 8, 6);
+  const deployDate = formatDate(contract.deployedAt);
+  const description = `Soroban smart contract deployed on ${contract.network} on ${deployDate}.`;
+
+  return {
+    title: `${shortAddress} · @${handle} · Signet`,
+    description,
+    alternates: {
+      canonical: `/p/${handle}/contract/${address}`,
+    },
+    openGraph: {
+      title: `${shortAddress} · @${handle} · Signet`,
+      description,
+      url: `/p/${handle}/contract/${address}`,
+    },
+  };
+}
+
 /**
  * Shell for the per-contract documentation route (#445, design §2.1):
  * attribution gate, profile identity strip, header slot, tab bar. Every
@@ -36,6 +75,35 @@ export default async function ContractLayout({
   params: Promise<{ handle: string; address: string }>;
   children: React.ReactNode;
 }) {
+  const refusal = await rateLimitDecision(await headers(), 'contract:page', LIMITS.contractPage);
+  if (refusal) {
+    // Next.js cannot set an HTTP 429 status code from a server component layout.
+    // We render an honest rate-limited state without making any upstream calls.
+    // Note that the attribution cache (#458) is what actually protects upstream services.
+    return (
+      <div className="relative min-h-screen bg-[#0a0908] text-[#f5f4ee]">
+        <SiteNav />
+        <main className="relative z-10 mx-auto max-w-5xl px-8 py-24 md:px-14">
+          <div className="border-l-2 border-[#8b1a1a] pl-5" role="status" data-testid="contract-page-rate-limited">
+            <h1
+              className="text-[20px] font-bold tracking-[-0.015em] text-[#f5f4ee]"
+              style={{ fontFamily: 'var(--font-display)' }}
+            >
+              Too many requests
+            </h1>
+            <p
+              className="mt-3 text-[13px] leading-[1.7] text-[#b8b5a8]"
+              style={{ fontFamily: 'var(--font-mono)' }}
+            >
+              Too many requests, retry in {refusal.retryAfter}s.
+            </p>
+          </div>
+        </main>
+        <SiteFooter />
+      </div>
+    );
+  }
+
   const { handle, address } = await params;
 
   // One attribution check for the whole route: the contract renders as part

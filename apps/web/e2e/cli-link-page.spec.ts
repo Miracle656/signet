@@ -188,6 +188,9 @@ test.describe('the /link approval page, state by state @db', () => {
     ).toBeVisible();
 
     // The copy button is keyboard-operable and has an accessible name.
+    // Headless Chromium denies clipboard writes unless the context grants them, and the
+    // component (correctly) shows no "Copied" state when the write is denied.
+    await page.context().grantPermissions(['clipboard-write']);
     const copy = page.getByRole('button', { name: /copy deploy wallet address/i });
     await expect(copy).toBeVisible();
     await copy.focus();

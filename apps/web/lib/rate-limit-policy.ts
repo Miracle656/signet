@@ -28,6 +28,16 @@ import { clientIp } from './security.ts';
  * limit than ordinary reads.
  */
 
+/**
+ * A positive integer from the environment, else `fallback`. Lets a deployment
+ * (or the e2e server, whose whole suite shares one `unknown` IP bucket) move a
+ * budget without a code change.
+ */
+function positiveIntFromEnv(name: string, fallback: number): number {
+  const parsed = Number(process.env[name]);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
 /** Per-minute allowances, chosen against what each endpoint costs to serve. */
 export const LIMITS = {
   /** Signs a transaction per call — the most expensive unauthenticated path. */
@@ -60,11 +70,37 @@ export const LIMITS = {
   /** Public v1 REST API read-only endpoints (anonymous per-IP budget). */
   v1Read: 60,
   /**
+   * Public v1 REST API read-only endpoints (keyed tier, higher budget).
+   * Configurable via API_KEY_RATE_LIMIT_PER_MIN env var (default: 300).
+   */
+  get v1Keyed(): number {
+    const envVal = process.env.API_KEY_RATE_LIMIT_PER_MIN;
+    if (envVal) {
+      const parsed = parseInt(envVal, 10);
+      if (!isNaN(parsed) && parsed > 0) return parsed;
+    }
+    return 300;
+  },
+  /**
    * Generates a downloadable TypeScript client stub (ZIP). CPU-intensive AST
    * generation and zip compression, unauthenticated per IP. Budgeted tightly
    * like auth verification to prevent resource exhaustion.
    */
   stubTs: 15,
+  /**
+   * Generates the downloadable Go client stub (one .go file). Cheaper than the
+   * TypeScript ZIP but the same anonymous per-IP exposure, so the same budget.
+   */
+  stubGo: 15,
+  /**
+   * Reads a page of contract operations. A plain database read, generous but bounded per IP.
+   */
+  contractOperations: 60,
+  /**
+   * Renders the contract documentation page. Each uncached render can trigger
+   * RPC and Horizon calls (which walk operations), so it is budgeted tighter than a plain read.
+   */
+  contractPage: positiveIntFromEnv('SIGNET_CONTRACT_PAGE_RATE_LIMIT_PER_MIN', 30),
   /**
    * Browser-posted CSP violation reports. A genuinely broken directive can fire
    * once per blocked subresource, so the ceiling is high enough that a real
