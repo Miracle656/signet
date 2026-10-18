@@ -82,7 +82,7 @@ test.describe('the /link approval page, state by state @db', () => {
     await page.reload();
     expect(new URL(page.url()).search).toContain(`code=${started.state}`);
     expect(new URL(page.url()).search).toContain(`user_code=${started.userCode}`);
-    await expect(page.getByRole('button', { name: /^approve$/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /^approve\b/i })).toBeVisible();
     await expect(page.getByText(deployer.publicKey())).toBeVisible();
   });
 
@@ -135,7 +135,7 @@ test.describe('the /link approval page, state by state @db', () => {
     await page.goto(`/link?code=${expired.state}&user_code=${expired.userCode}`);
     await expect(page.getByRole('heading', { name: /can’t approve this/i })).toBeVisible();
     await expect(page.getByText(/has expired/i)).toBeVisible();
-    await expect(page.getByRole('button', { name: /^approve$/i })).not.toBeVisible();
+    await expect(page.getByRole('button', { name: /^approve\b/i })).not.toBeVisible();
   });
 
   test('a mainnet pairing on a testnet deployment shows the mismatch, with no Approve', async ({
@@ -162,7 +162,7 @@ test.describe('the /link approval page, state by state @db', () => {
     await page.goto(`/link?code=${mismatched.state}&user_code=${mismatched.userCode}`);
     await expect(page.getByText(/this pairing is for mainnet/i)).toBeVisible();
     await expect(page.getByText(/this deployment serves testnet/i)).toBeVisible();
-    await expect(page.getByRole('button', { name: /^approve$/i })).not.toBeVisible();
+    await expect(page.getByRole('button', { name: /^approve\b/i })).not.toBeVisible();
   });
 
   test('the approval form shows network, countdown, copy button and the consent text', async ({
@@ -199,8 +199,8 @@ test.describe('the /link approval page, state by state @db', () => {
     await expect(page.getByText(/^copied$/i)).toBeVisible();
 
     // Both action buttons are reachable by keyboard.
-    await page.getByRole('button', { name: /^approve$/i }).focus();
-    await expect(page.getByRole('button', { name: /^approve$/i })).toBeFocused();
+    await page.getByRole('button', { name: /^approve\b/i }).focus();
+    await expect(page.getByRole('button', { name: /^approve\b/i })).toBeFocused();
     await page.keyboard.press('Tab');
     await expect(page.getByRole('button', { name: /^reject$/i })).toBeFocused();
   });
